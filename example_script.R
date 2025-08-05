@@ -13,8 +13,6 @@ package.check <- lapply(packages, FUN = function(x) {
   }
 })
 
-library(tensorflow)
-
 # Set tensorflow seed
 set_random_seed(1)
 
@@ -28,11 +26,19 @@ gpd.nunits = c(16,16,16)
 
 l.r.vec = c(0.001, 5e-04,  1e-04)
 
+run_QR = F
+
+run_GPD = T
+
+it = 1
+
 # Load in data --------------------------------------------------------------------
 
 df <- read.csv("Data/wind_wave_data.csv")
 X <- as.matrix(df[, c(5:6, 7:8, 9)])  
 X[, 5] <- log(X[, 5])
+
+wave.names = colnames(X)
 
 means = apply(X, 2, mean)
 means[1:4]=0
@@ -68,45 +74,49 @@ W.valid <- W[valid.inds,]
 R.test <- R[test.inds]
 W.test <- W[test.inds,]
 
-input_pseudo_angles <- layer_input(shape = d, name = "input_pseudo_angles")
-
-qBranch <- input_pseudo_angles %>%
-  layer_dense(units = quant.nunits[1], activation = activation.func, name = "q_dense1", kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
-                                                                                                                               l2 = 1e-04))
-for (i in 2:length(quant.nunits)) {
-  qBranch <- qBranch %>%
-    layer_dense(units = quant.nunits[i], activation = activation.func, name = paste0("q_dense", i), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
-                                                                                                                                           l2 = 1e-04))
-}
-
-qBranch <- qBranch %>%
-  layer_dense(units = 1, activation = "exponential", name = "q_final", kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
-                                                                                                              l2 = 1e-04))  
-# Construct Keras model
-quant.model <- keras_model(inputs = c(input_pseudo_angles), outputs = c(qBranch))
-
-
-# Compile the model with the tilted loss and the adam optimiser
-quant.model %>%
-  compile(optimizer = "adam", loss = tilted_loss, run_eagerly = T)
-
-checkpoint <- callback_model_checkpoint(filepath = paste0("runs/QR_est/qr_fit_q_",quant.level), monitor = "val_loss", verbose = 0,
-                                        save_best_only = TRUE, save_weights_only = TRUE, mode = "min", save_freq = "epoch")
-n.epochs <- 100  # Set number of epochs for training
-batch.size <- 512
-
-dim(R)=c(length(R),1); dim(R.train)=c(length(R.train),1); dim(R.valid)=c(length(R.valid),1);dim(R.test)=c(length(R.test),1)
-
-history <- quant.model %>%
+if(run_QR == T){
   
-  fit(list(W.train), R.train, epochs = n.epochs, batch_size = batch.size, callback = list(checkpoint,
-                                                                                          callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)), validation_data = list(list(input_pseudo_angles = W.valid),R.valid))
-
-# Load the best fitting model from the checkpoint save
-quant.model <- load_model_weights_tf(quant.model, filepath = paste0("runs/QR_est/qr_fit_q_",quant.level))
-
-# Then save the best model.
-save_model_tf(quant.model, paste0("runs/QR_est/qr_fit_q_",quant.level))
+  input_pseudo_angles <- layer_input(shape = d, name = "input_pseudo_angles")
+  
+  qBranch <- input_pseudo_angles %>%
+    layer_dense(units = quant.nunits[1], activation = activation.func, name = "q_dense1", kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
+                                                                                                                                 l2 = 1e-04))
+  for (i in 2:length(quant.nunits)) {
+    qBranch <- qBranch %>%
+      layer_dense(units = quant.nunits[i], activation = activation.func, name = paste0("q_dense", i), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
+                                                                                                                                             l2 = 1e-04))
+  }
+  
+  qBranch <- qBranch %>%
+    layer_dense(units = 1, activation = "exponential", name = "q_final", kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
+                                                                                                                l2 = 1e-04))  
+  # Construct Keras model
+  quant.model <- keras_model(inputs = c(input_pseudo_angles), outputs = c(qBranch))
+  
+  
+  # Compile the model with the tilted loss and the adam optimiser
+  quant.model %>%
+    compile(optimizer = "adam", loss = tilted_loss, run_eagerly = T)
+  
+  checkpoint <- callback_model_checkpoint(filepath = paste0("runs/QR_est/qr_fit_q_",quant.level), monitor = "val_loss", verbose = 0,
+                                          save_best_only = TRUE, save_weights_only = TRUE, mode = "min", save_freq = "epoch")
+  n.epochs <- 100  # Set number of epochs for training
+  batch.size <- 512
+  
+  dim(R)=c(length(R),1); dim(R.train)=c(length(R.train),1); dim(R.valid)=c(length(R.valid),1);dim(R.test)=c(length(R.test),1)
+  
+  history <- quant.model %>%
+    
+    fit(list(W.train), R.train, epochs = n.epochs, batch_size = batch.size, callback = list(checkpoint,
+                                                                                            callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)), validation_data = list(list(input_pseudo_angles = W.valid),R.valid))
+  
+  # Load the best fitting model from the checkpoint save
+  quant.model <- load_model_weights_tf(quant.model, filepath = paste0("runs/QR_est/qr_fit_q_",quant.level))
+  
+  # Then save the best model.
+  save_model_tf(quant.model, paste0("runs/QR_est/qr_fit_q_",quant.level))
+  
+}
 
 quant.model <- tf$saved_model$load(paste0("runs/QR_est/qr_fit_q_",quant.level))
 
@@ -146,19 +156,17 @@ dim(u.train) = c(length(u.train), 1)
 dim(u.valid) = c(length(u.valid), 1)
 dim(u.test) = c(length(u.test), 1)
 
-input_pseudo_angles <- layer_input(shape = d, name = "input_pseudo_angles")
+input.pseudo.angles <- layer_input(shape = d, name = "input.pseudo.angles")
+input.u <- layer_input(shape = d, name = "input.u")
 
-input_u <- layer_input(shape = d, name = "input_u")
-
-
-gpd.Branch <- input_pseudo_angles %>%
-  layer_dense(units = gpd.nunits[1], activation = activation.func, name = "gpd_dense1", kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
-                                                                                                                                     l2 = 1e-04))  #First hidden layer
+gpd.Branch <- input.pseudo.angles %>%
+  layer_dense(units = gpd.nunits[1], activation = "relu", name = "gpd_dense1", kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
+                                                                                                                      l2 = 1e-04))  #First hidden layer
 if (length(gpd.nunits) >= 2) {
   for (i in 2:length(gpd.nunits)) {
     gpd.Branch <- gpd.Branch %>%
-      layer_dense(units = gpd.nunits[i], activation = activation.func, name = paste0("gpd_dense", i), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
-                                                                                                                                                   l2 = 1e-04))  #Subsequent hidden layers
+      layer_dense(units = gpd.nunits[i], activation = "relu", name = paste0("gpd_dense", i), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
+                                                                                                                                    l2 = 1e-04))  #Subsequent hidden layers
   }
 }
 
@@ -168,49 +176,51 @@ GPD_custom_activation <- function(x) {
             axis = 1L)
 }
 
-init_bias = atanh(1)
-
 gpd.Branch <- gpd.Branch %>%
-  layer_dense(units = 2, activation = GPD_custom_activation, name = "gpd_final", weights = list(matrix(0,nrow = gpd.nunits[length(gpd.nunits)], ncol = 2), array(init_bias, dim = c(2))), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,l2 = 1e-04))
-
-output <- layer_concatenate(c(gpd.Branch, input_u, input_pseudo_angles))
+  layer_dense(units = 2, activation = GPD_custom_activation, name = "gpd_final", weights = list(matrix(0,
+                                                                                                       nrow = gpd.nunits[length(gpd.nunits)], ncol = 2), array(atanh(0.25/0.3), dim = c(2))), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
+                                                                                                                                                                                                                         l2 = 1e-04))
+output <- layer_concatenate(c(gpd.Branch, input.u, input.pseudo.angles))
 
 # Construct Keras model
-GPD.model <- keras_model(inputs = c(input_pseudo_angles, input_u), outputs = output)
+GPD.model <- keras_model(inputs = c(input.pseudo.angles, input.u), outputs = output)
 summary(GPD.model)
 
+# Compile the model with the GPD loss and the adam optimiser Note that GPD loss takes T0 and a
+# penalty rate as input)
 GPD.model %>%
-  compile(optimizer = optimizer_adam(learning_rate = l.r.vec[1]), loss = GPD_loss, run_eagerly = T)
+  compile(optimizer = optimizer_adam(learning_rate = 0.001), loss = GPD_loss(0, penalty = 0), run_eagerly = T)
 
-n.epochs <- 500
-batch.size = length(R.train)
 
-checkpoint <- callback_model_checkpoint(filepath = paste0("runs/GPD_est/gpd_fit_{epoch:02d}_q_",quant.level), 
-                                        monitor = "val_loss", 
-                                        verbose = 0, 
-                                        save_best_only = FALSE, 
-                                        save_weights_only = TRUE, 
-                                        mode = "min",
+# After every epoch, we use a checkpoint to save the weights.  Only the current best version of
+# the model is saved, i.e., the one that minimises the loss evaluated on the validation data
+
+checkpoint <- callback_model_checkpoint(filepath = paste0("runs/GPD_est/gpd_fit_{epoch:02d}"), monitor = "val_loss", verbose = 0, save_best_only = FALSE, save_weights_only = TRUE, mode = "min",
                                         save_freq = "epoch")
 
+
+###### Train Keras model ######
+
+n.epochs <- 500  # Set number of epochs for training
+batch.size = length(R.train)  # Set mini-batch size. Entire dataset
+
+
+# Train Keras model. Loss values will be story in history object.
 history <- GPD.model %>%
-  fit(list(W.train, u.train), R.train,
-      epochs = n.epochs,
-      batch_size = batch.size,
-      callback = list(checkpoint,
-                      callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)),
-      validation_data = list(list(input_pseudo_angles = W.valid,input_u = u.valid), R.valid))
+  fit(list(W.train, u.train), R.train, epochs = n.epochs, 
+      batch_size = batch.size, callback = list(checkpoint,callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)), 
+      validation_data = list(list(input.pseudo.angles = W.valid,input.u = u.valid), R.valid))
+                                                                                                                                                                                                            
 
 optimal_epoch = which.min(history$metrics$val_loss)
+
 GPD.model <- load_model_weights_tf(GPD.model,
                                    filepath = paste0(
                                      "runs/GPD_est/gpd_fit_",
-                                     sprintf("%02d", optimal_epoch-1),
-                                     "q_",quant.level
-                                   ))
+                                     sprintf("%02d", optimal_epoch-1)))
 
-save_model_weights_tf(GPD.model,  paste0("runs/GPD_est/gpd_fit_best_weights_q_",quant.level))
-save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit_initialisation_q_",quant.level))
+save_model_weights_tf(GPD.model,  paste0("runs/GPD_est/gpd_fit_best_weights"))
+save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit"))
 
 
 # Best Validation loss
@@ -220,16 +230,13 @@ best.valid.loss <- history$metrics$val_loss[which.min(history$metrics$val_loss)-
 for (k in 2:length(l.r.vec)) {
   print(paste0("Decreasing learning rate size to: ", l.r.vec[k]))
   GPD.model %>%
-    compile(optimizer = optimizer_adam(learning_rate = l.r.vec[k]), loss = GPD_loss,
+    compile(optimizer = optimizer_adam(learning_rate = l.r.vec[k]), loss = GPD_loss(0, penalty = 0),
             run_eagerly = T)
   
   history <- GPD.model %>%
-    fit(list(W.train, u.train), R.train,
-        epochs = n.epochs,
-        batch_size = batch.size,
-        callback = list(checkpoint,
-                        callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 10)),
-        validation_data = list(list(input_pseudo_angles = W.valid,input_u = u.valid), R.valid))
+    fit(list(W.train, u.train), R.train, epochs = n.epochs, batch_size = batch.size, callback = list(checkpoint,
+                                                                                                     callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)), validation_data = list(list(input.pseudo.angles = W.valid,
+                                                                                                                                                                                                              input.u = u.valid), R.valid))
   
   
   
@@ -255,18 +262,16 @@ for (k in 2:length(l.r.vec)) {
       GPD.model,
       filepath = paste0(
         "runs/GPD_est/gpd_fit_",
-        sprintf("%02d", optimal_epoch),
-        "q_",quant.level
-      )
+        sprintf("%02d", optimal_epoch))
     )
-    save_model_weights_tf(GPD.model, paste0("runs/GPD_est/gpd_fit_best_weights_q_",quant.level))
-    save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit_initialisation_q_",quant.level))
+    save_model_weights_tf(GPD.model, paste0("runs/GPD_est/gpd_fit_best_weights"))
+    save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit"))
     
   } else{
     load_model_weights_tf(
       GPD.model,
       filepath = paste0(
-        "runs/GPD_est/gpd_fit_best_weightsq_",quant.level
+        "runs/GPD_est/gpd_fit_best_weights"
       )
     )
   }
@@ -297,7 +302,7 @@ n_p = length(R.test)
 ps = (1:n_p)/(n_p + 1) 
 theor_quants = qexp(ps)
 
-pdf(file=paste0("Validation/gpd_qq_plot_",array_id,".pdf"),width=5,height=5)
+pdf(file=paste0("Validation/gpd_qq_plot.pdf"),width=5,height=5)
 
 plot(theor_quants,sort(obs_quants),pch=16,col="grey",cex.lab=1.3, cex.axis=1.2,cex.main=1.5,xlim=range(sort(obs_quants),theor_quants),ylim=range(sort(obs_quants),theor_quants),xlab = "Theoretical",ylab = "Observed",main="GPD QQ plot")
 abline(a=0,b=1,lwd=4,col=2)
@@ -335,27 +340,27 @@ X.sim = rbind(X.sim, R.sim*W.sim)
 
 #We only want to evaluate marginal tails outside of the quantile set. Therefore, we just looks at marginal probabilities in this region
 
-pred_phis = seq(0,2*pi,length.out=1001)
+# pred_phis = seq(0,2*pi,length.out=1001)
+# 
+# W.circle = as.matrix(cbind(cos(pred_phis),sin(pred_phis)))
+# 
+# u.circle <- k_get_value(quant.model(k_constant(W.circle)))
+# 
+# quant.set = c(u.circle)*W.circle
+# 
+# quant.set.maxima = apply(quant.set,2,max)
+# 
+# quant.set.minima = apply(quant.set,2,min)
 
-W.circle = cbind(cos(pred_phis),sin(pred_phis))
+pdf(file=paste0("Validation/marginal_qq_plots.pdf"),width=15,height=6)
 
-u.circle <- k_get_value(quant.model(k_constant(W.circle)))
-
-quant.set = c(u.circle)*W.circle
-
-quant.set.maxima = apply(quant.set,2,max)
-
-quant.set.minima = apply(quant.set,2,min)
-
-pdf(file=paste0("Validation/marginal_qq_plots_",array_id,".pdf"),width=10,height=10)
-
-par(mfrow=c(2,2))
+par(mfrow=c(2,5))
 
 for(i in 1:d){
   
-  title = (river_names[c(river1_ind,river2_ind)])[i]
+  title = wave.names[i]
   
-  min_quant = sum(X.norm[,i] <= quant.set.maxima[i])/(nrow(X.norm)+1)
+  # min_quant = sum(X.norm[,i] <= quant.set.maxima[i])/(nrow(X.norm)+1)
   
   ps  = seq(0.99, 1 - 1/nrow(X.norm), length = 500)
   
@@ -378,9 +383,9 @@ for(i in 1:d){
 
 for(i in 1:d){
   
-  title = (river_names[c(river1_ind,river2_ind)])[i]
+  title = wave.names[i]
   
-  max_quant = sum(X.norm[,i] <= quant.set.minima[i])/(nrow(X.norm)+1)
+  # max_quant = sum(X.norm[,i] <= quant.set.minima[i])/(nrow(X.norm)+1)
   
   ps  = seq( 1/nrow(X.norm),0.01, length = 500)
   
@@ -402,6 +407,7 @@ for(i in 1:d){
 
 dev.off()
 
+#From here 
 
 X.excess.obs = apply(rbind(mus,X.norm.excess),2,function(x){return(x[-1] + x[1])})
 
@@ -411,7 +417,7 @@ X.excess.sim = apply(rbind(mus,(R.sim*W.sim)),2,function(x){return(x[-1] + x[1])
 
 X.excess.sim = apply(rbind(minima,sigmas,X.excess.sim),2,function(x){return( (log(exp(x[-c(1:2)])+1) - 1e-3)*x[2] + x[1])})
 
-png(file=paste0("Validation/scatterplot_",array_id,".png"),width=800,height=800,res = 100)
+png(file=paste0("Validation/scatterplot.png"),width=800,height=800,res = 100)
 
 labels <- river_names[c(river1_ind,river2_ind)]
 
