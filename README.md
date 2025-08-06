@@ -70,16 +70,16 @@ If there are any problems, we recommend always restarting the R session and maki
 
 A brief description of each of the provided R scripts is given below
 
-* **case_study.R** - this file demonstrates how to fit the deepGauge framework to one of the metocean datasets considered in the Case Study of Murphy-Barltrop et al. (2024).  
-* **new_layers.R** - this file contains additional neural network layers required for imposing theoretical properties on the limit set.
+* **example_script.R** - this file demonstrates how to fit the SPAR framework with neural networks to the metocean dataset considered in Mackay et al. (2024).  
 * **preamble.R** - this file contains a range of functions required for fitting the model.
+* **virtual_env_script.R** - this file contains all of the code from above for setting up the virtual environment.
 
 The repo also contains the following folders
 
-* **Datafiles** - this folder contains all of required datafiles for running the case_study.R file. 
-* **QR_est** - this folder provides a place for storing the weights associated with the quantile regression model.
-* **Gauge_est** - this folder provides a place for storing the weights associated with the gauge function model.
-* **Diagnostics** - this folder is where the visual diagnostics from case_study.R are stored. 
+* **Data** - this folder contains the data for running the example_script.R file. 
+* **runs/QR_est** - this folder provides a place for storing the weights associated with the quantile regression model.
+* **runs/GPD_est** - this folder provides a place for storing the weights associated with the GPD model.
+* **Validation** - this folder is where the visual diagnostics from example_script.R are stored. 
 
 ## Questions?
 
@@ -87,5 +87,5 @@ Please get in touch if you have any questions, or if you find a bug in the code.
 
 ### References
 
-Murphy-Barltrop, C. J., Majumder, R., & Richards, J. (2024). Deep learning of multivariate extremes via a geometric representation. arXiv preprint arXiv:2406.19936.
+Mackay, E., Murphy-Barltrop, C., Richards, J., & Jonathan, P. (2024). Deep learning joint extremes of metocean variables using the SPAR model. arXiv preprint arXiv:2412.15808.
 

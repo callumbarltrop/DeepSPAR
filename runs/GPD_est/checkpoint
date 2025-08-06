@@ -1,0 +1,2 @@
+model_checkpoint_path: "gpd_fit_10"
+all_model_checkpoint_paths: "gpd_fit_10"

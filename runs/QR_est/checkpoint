@@ -1,2 +1,2 @@
-model_checkpoint_path: "qr_fit_q_0.9"
-all_model_checkpoint_paths: "qr_fit_q_0.9"
+model_checkpoint_path: "qr_fit"
+all_model_checkpoint_paths: "qr_fit"
