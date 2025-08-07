@@ -37,10 +37,10 @@ gpd.nunits = c(16,16,16)
 l.r.vec = c(0.001, 5e-04,  1e-04)
 
 # Flag to indicate whether to fit the quantile regression model. If you have already fitted it to data, set this to F
-run_QR = F
+run_QR = T
 
 # Flag to indicate whether to fit the GPD model. If you have already fitted it to data, set this to F
-run_GPD = F
+run_GPD = T
 
 # Load in and normalise data --------------------------------------------------------------------
 
