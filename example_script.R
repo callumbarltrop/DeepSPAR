@@ -231,9 +231,15 @@ if(run_GPD){
   
   # Construct final layer such that initial output gives a constant shape parameter of init_shape
   gpd.Branch <- gpd.Branch %>%
-    layer_dense(units = 2, activation = GPD_custom_activation, name = "gpd_final", weights = list(matrix(0,
-                                                                                                         nrow = gpd.nunits[length(gpd.nunits)], ncol = 2), array(atanh((0.2 + init_shape)/0.3), dim = c(2))), kernel_regularizer = regularizer_l1_l2(l1 = 1e-04,
-                                                                                                                                                                                                                           l2 = 1e-04))
+    layer_dense(
+      units = 2,
+      activation = GPD_custom_activation,
+      name = "gpd_final",
+      weights = list(matrix(0, nrow = gpd.nunits[length(gpd.nunits)], ncol = 2), array(atanh((0.2 + init_shape) /
+                                                                                               0.3
+      ), dim = c(2))),
+      kernel_regularizer = regularizer_l1_l2(l1 = 1e-04, l2 = 1e-04)
+    )
   output <- layer_concatenate(c(gpd.Branch, input.u, input.pseudo.angles))
   
   GPD.model <- keras_model(inputs = c(input.pseudo.angles, input.u), outputs = output)
@@ -258,24 +264,28 @@ if(run_GPD){
 
   history <- GPD.model %>%
     fit(list(W.train, u.train), R.train, epochs = n.epochs, batch_size = batch.size, 
-        callback = list(checkpoint,callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)), 
+        callback = list(checkpoint,callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 10)), 
         validation_data = list(list(input.pseudo.angles = W.valid,input.u = u.valid), R.valid))
   
   # Select the epoch with the minimal loss function
   optimal_epoch = which.min(history$metrics$val_loss)
   
   # Load in the corresponding weights of the optimal epoch 
-  GPD.model <- load_model_weights_tf(GPD.model,filepath = paste0("runs/GPD_est/gpd_fit_",sprintf("%02d", optimal_epoch-1)))
-  
+
+  GPD.model <- load_model_weights_tf(GPD.model,filepath = paste0("runs/GPD_est/gpd_fit_",sprintf("%02d", optimal_epoch)))
+ 
   # Save weights and model at optimal epoch
   save_model_weights_tf(GPD.model,  paste0("runs/GPD_est/gpd_fit_best_weights"))
   save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit"))
   
-  # Store best loss value from training 
-  best.valid.loss <- history$metrics$val_loss[which.min(history$metrics$val_loss)-1]
+
+  # Best Validation loss
+  pred.GPD.valid <- k_get_value(GPD.model(list(k_constant(W.valid), k_constant(u.valid))))
+  best.valid.loss <- k_get_value(GPD_loss(0, 0)(k_constant(R.valid), k_constant(pred.GPD.valid)))
+  
   
   # The following code iteratively decreases the learning rate to see if we can improve the parameter estimates
-  for (k in 2:length(l.r.vec)) {
+  for (k in 1:length(l.r.vec)) {
     print(paste0("Decreasing learning rate size to: ", l.r.vec[k]))
     
     # Take the existing GPD model and continue optimising with a smaller learning rate 
@@ -285,7 +295,7 @@ if(run_GPD){
     
     history <- GPD.model %>%
       fit(list(W.train, u.train), R.train, epochs = n.epochs, batch_size = batch.size, 
-          callback = list(checkpoint,callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 5)), 
+          callback = list(checkpoint,callback_early_stopping(monitor = "val_loss", min_delta = 0, patience = 10)), 
           validation_data = list(list(input.pseudo.angles = W.valid,input.u = u.valid), R.valid))
     
     # Check to see if validation loss has decreased. If so, save optimal epoch and loss value 
@@ -295,8 +305,7 @@ if(run_GPD){
         print("Validation loss has not decreased :(")
       } else {
         optimal_epoch = which.min(history$metrics$val_loss)
-        best.valid.loss <- history$metrics$val_loss[optimal_epoch]
-        
+
         print("Validation loss has decreased :)")
       }
     } else {
@@ -312,8 +321,7 @@ if(run_GPD){
           "runs/GPD_est/gpd_fit_",
           sprintf("%02d", optimal_epoch))
       )
-      save_model_weights_tf(GPD.model, paste0("runs/GPD_est/gpd_fit_best_weights"))
-      save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit"))
+    
       
     } else {
     # Else, we revert back to previous weights 
@@ -326,6 +334,14 @@ if(run_GPD){
     }
     
   }
+  # Then save the best model.
+  save_model_weights_tf(GPD.model, "runs/GPD_est/gpd_fit_best_weights")
+  save_model_tf(GPD.model, paste0("runs/GPD_est/gpd_fit"))
+  
+
+  pred.GPD.valid <- k_get_value(GPD.model(list(k_constant(W.valid), k_constant(u.valid))))
+  best.valid.loss <- k_get_value(GPD_loss(0, 0)(k_constant(R.valid), k_constant(pred.GPD.valid)))
+  
   
 }
 
@@ -345,7 +361,7 @@ obs_quants = qexp(apply(cbind(u.test, pred.GPD.test[,1:2], R.test+u.test), 1,
 # Compute length of observed quantiles 
 n_p = length(R.test) 
 
-# Compute corresponding theoretical quantiles on an eponential scale 
+# Compute corresponding theoretical quantiles on an exponential scale 
 ps = (1:n_p)/(n_p + 1) 
 theor_quants = qexp(ps)
 
