@@ -1,4 +1,4 @@
-# DeepSPAR -- example code for fitting the SPAR framework using neural networks, as detailed in of Mackay et al. (2024)
+# DeepSPAR -- example code for fitting the SPAR framework using neural networks, as detailed in of Mackay et al. (2025)
 
 In order to use this framework via R, you first need to download and install Tensorflow and Keras 2 on your workstation. This involves several steps which we detail below.
 
@@ -87,5 +87,5 @@ Please get in touch if you have any questions, or if you find a bug in the code.
 
 ### References
 
-Mackay, E., Murphy-Barltrop, C., Richards, J., & Jonathan, P. (2024). Deep learning joint extremes of metocean variables using the SPAR model. arXiv preprint arXiv:2412.15808.
+Mackay, E. B., Murphy-Barltrop, C. J., Richards, J., & Jonathan, P. (2025). Deep learning joint extremes of metocean variables using the SPAR model. In International Conference on Offshore Mechanics and Arctic Engineering (Vol. 88926, p. V003T06A034). American Society of Mechanical Engineers.
 
