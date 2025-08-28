@@ -70,7 +70,7 @@ If there are any problems, we recommend always restarting the R session and maki
 
 A brief description of each of the provided R scripts is given below
 
-* **example_script.R** - this file demonstrates how to fit the SPAR framework with neural networks to the metocean dataset considered in Mackay et al. (2024).  
+* **example_script.R** - this file demonstrates how to fit the SPAR framework with neural networks to the metocean dataset considered in Mackay et al. (2025).  
 * **preamble.R** - this file contains a range of functions required for fitting the model.
 * **virtual_env_script.R** - this file contains all of the code from above for setting up the virtual environment.
 
