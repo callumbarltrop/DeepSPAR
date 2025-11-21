@@ -87,5 +87,7 @@ Please get in touch if you have any questions, or if you find a bug in the code.
 
 ### References
 
-Mackay, E. B., Murphy-Barltrop, C. J., Richards, J., & Jonathan, P. (2025). Deep learning joint extremes of metocean variables using the SPAR model. In International Conference on Offshore Mechanics and Arctic Engineering (Vol. 88926, p. V003T06A034). American Society of Mechanical Engineers.
+Mackay, E. B., Murphy-Barltrop, C. J., Richards, J., & Jonathan, P. (2025, June). Deep learning joint extremes of metocean variables using the SPAR model. In International Conference on Offshore Mechanics and Arctic Engineering (Vol. 88926, p. V003T06A034). American Society of Mechanical Engineers.
+
+Mackay, E., Murphy-Barltrop, C. J. R., Richards, J., and Jonathan, P. (2025, November). Deep Learning Joint Extremes of Metocean Variables Using the SPAR Model. ASME. J. Offshore Mech. Arct. Eng. April 2026; 148(2): 021201.
 
